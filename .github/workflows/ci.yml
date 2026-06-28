@@ -1,0 +1,96 @@
+name: AutoML MLOps CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  # ── Lint & Test ────────────────────────────────────────────────────────────
+  test:
+    name: Lint & Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt pytest
+
+      - name: Run tests
+        run: |
+          cd phase1_core
+          python -c "
+          from data.data_utils import load_sklearn_dataset
+          path, target = load_sklearn_dataset('breast_cancer')
+          from automl.trainer import AutoMLTrainer
+          trainer = AutoMLTrainer(target_column=target, n_trials=3, cv_folds=2, models_to_try=['random_forest'])
+          trainer.fit(path)
+          from automl.predictor import Predictor
+          pred = Predictor(model_dir='models')
+          info = pred.get_model_info()
+          assert info['model'] == 'random_forest', 'Wrong model'
+          print('All tests passed ✅')
+          "
+
+  # ── Docker Build ────────────────────────────────────────────────────────────
+  docker:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/automl-mlops:latest
+            ${{ secrets.DOCKER_USERNAME }}/automl-mlops:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ── Drift Check on Schedule ─────────────────────────────────────────────────
+  drift_check:
+    name: Scheduled Drift Check
+    runs-on: ubuntu-latest
+    # Run daily at midnight UTC — adjust cron as needed
+    # (Uncomment on: schedule block to enable)
+    if: false  # Enable by adding schedule trigger
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install deps
+        run: pip install -r requirements.txt
+      - name: Run drift check
+        run: |
+          python -c "
+          import sys; sys.path.insert(0, 'phase3_drift')
+          # In production, download latest prediction log here
+          # then run: DriftMonitor().watch_prediction_log('models/prediction_log.jsonl')
+          print('Drift check step — wire up production log path here')
+          "

@@ -1,0 +1,46 @@
+# render.yaml — Render.com deployment config
+# Deploy both FastAPI and Streamlit as separate Render services (both free tier)
+
+services:
+  # ── FastAPI Backend (Web Service) ─────────────────────────────────────────
+  - type: web
+    name: automl-mlops-api
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn phase2_api.api.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: MODEL_DIR
+        value: /opt/render/project/src/models
+      - key: DATA_DIR
+        value: /opt/render/project/src/data
+      - key: PYTHON_VERSION
+        value: 3.11.0
+    healthCheckPath: /health
+    autoDeploy: true
+    disk:
+      name: automl-models
+      mountPath: /opt/render/project/src/models
+      sizeGB: 1
+
+  # ── Streamlit Dashboard (Web Service) ─────────────────────────────────────
+  - type: web
+    name: automl-mlops-dashboard
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: >
+      streamlit run phase3_drift/dashboard/app.py
+      --server.port $PORT
+      --server.address 0.0.0.0
+      --server.headless true
+    envVars:
+      - key: MODEL_DIR
+        value: /opt/render/project/src/models
+      - key: PYTHON_VERSION
+        value: 3.11.0
+    autoDeploy: true
+    disk:
+      name: automl-models-dash
+      mountPath: /opt/render/project/src/models
+      sizeGB: 1

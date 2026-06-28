@@ -1,0 +1,50 @@
+version: "3.9"
+
+services:
+  # ── FastAPI Backend ───────────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: automl_api
+    command: api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./models:/app/models
+      - ./data:/app/data
+      - ./drift_reports:/app/drift_reports
+    environment:
+      - MODEL_DIR=/app/models
+      - DATA_DIR=/app/data
+      - PORT=8000
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # ── Streamlit Dashboard ───────────────────────────────────────────────────
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: automl_dashboard
+    command: dashboard
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./models:/app/models
+      - ./drift_reports:/app/drift_reports
+    environment:
+      - MODEL_DIR=/app/models
+      - PORT=8501
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  models:
+  data:
+  drift_reports:

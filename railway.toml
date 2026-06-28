@@ -1,0 +1,21 @@
+# railway.toml — Railway.app deployment config
+
+[build]
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+startCommand = "./entrypoint.sh api"
+healthcheckPath = "/health"
+healthcheckTimeout = 100
+restartPolicyType = "on-failure"
+restartPolicyMaxRetries = 3
+
+[[services]]
+name = "automl-api"
+source = "."
+
+[services.variables]
+PORT = "8000"
+MODEL_DIR = "/app/models"
+DATA_DIR = "/app/data"
