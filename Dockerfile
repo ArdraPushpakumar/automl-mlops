@@ -1,19 +1,15 @@
 FROM python:3.11-slim
 
+RUN useradd -m -u 1000 user
+USER user
+ENV PATH="/home/user/.local/bin:$PATH"
+
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential curl && \
-    rm -rf /var/lib/apt/lists/*
+COPY --chown=user requirements_hf.txt requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+COPY --chown=user . /app
+RUN mkdir -p drift_reports data models
 
-COPY . .
-RUN mkdir -p models data drift_reports && chmod +x entrypoint.sh
-
-EXPOSE 8000
-
-ENTRYPOINT ["./entrypoint.sh"]
-CMD ["api"]
+CMD streamlit run drift/dashboard/app.py --server.port 7860 --server.address 0.0.0.0 --server.headless true
