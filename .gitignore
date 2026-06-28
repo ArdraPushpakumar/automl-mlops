@@ -38,3 +38,6 @@ Thumbs.db
 
 # Optuna
 optuna.db
+
+!models/best_model.pkl
+!models/label_encoder.pkl
